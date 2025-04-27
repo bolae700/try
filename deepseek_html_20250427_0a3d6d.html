@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Game Player</title>
+    <style>
+        :root {
+            --red: #E71B1B;
+            --yellow: #FEDE00;
+            --blue: #049CD8;
+            --bg: #1a1a1a;
+            --metal: #7D7D7D;
+        }
+
+        body {
+            background: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Press Start 2P', 'Courier New', monospace;
+            position: relative;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .crt-scanlines {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.2) 0px,
+                rgba(0, 0, 0, 0.2) 2px,
+                transparent 3px,
+                transparent 4px
+            );
+            pointer-events: none;
+            z-index: 999;
+            animation: scanline 3s linear infinite;
+            will-change: transform;
+        }
+
+        @keyframes scanline {
+            from { transform: translateY(-100%); }
+            to { transform: translateY(100%); }
+        }
+
+        .pixel-bg {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: 
+                repeating-linear-gradient(0deg, 
+                    transparent 0px, 
+                    transparent 1px, 
+                    rgba(255,255,255,0.04) 2px, 
+                    rgba(255,255,255,0.04) 3px
+                ),
+                repeating-linear-gradient(90deg, 
+                    transparent 0px, 
+                    transparent 1px, 
+                    rgba(255,255,255,0.04) 2px, 
+                    rgba(255,255,255,0.04) 3px
+                );
+            z-index: 0;
+            animation: moveGrid 20s linear infinite;
+        }
+
+        @keyframes moveGrid {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-50%, -50%); }
+        }
+
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--duration) ease-in-out infinite;
+            will-change: opacity;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+
+        .gameboy-frame {
+            width: 340px;
+            background: #6B6B6B;
+            border: 10px solid #4A4A4A;
+            border-radius: 18px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 
+                0 0 20px rgba(0,0,0,0.5),
+                inset 0 0 15px rgba(0,0,0,0.2);
+            z-index: 2;
+        }
+
+        .screen {
+            background: repeating-linear-gradient(
+                transparent,
+                transparent 3px,
+                rgba(0,0,0,0.2) 4px,
+                rgba(0,0,0,0.2) 5px
+            ), #8BAC0F;
+            border: 6px solid #4A5C2B;
+            padding: 15px;
+            margin-bottom: 20px;
+            position: relative;
+            box-shadow: 
+                inset 0 0 15px rgba(0,0,0,0.3),
+                0 3px 8px rgba(0,0,0,0.5);
+            overflow: hidden;
+            z-index: 3;
+        }
+
+        #visualizer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.3;
+            mix-blend-mode: screen;
+        }
+
+        .brand-label {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4A4A4A;
+            color: var(--yellow);
+            padding: 3px 12px;
+            border-radius: 4px;
+            font-size: 0.5em;
+            text-shadow: 1px 1px #000;
+        }
+
+        .track-info {
+            color: var(--yellow);
+            text-align: center;
+            margin: 12px 0;
+            text-shadow: 2px 2px #000;
+            min-height: 50px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .track-info div:first-child {
+            font-size: 0.9em;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+
+        .track-info div:last-child {
+            font-size: 0.6em;
+            opacity: 0.8;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            margin: 12px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .progress {
+            height: 100%;
+            background: var(--yellow);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s linear;
+        }
+
+        .controls-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .designer-label {
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--red);
+            font-size: 1em;
+            text-shadow: 1px 1px #000;
+            white-space: nowrap;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template: 
+                ". up ."
+                "left center right"
+                ". down .";
+            gap: 5px;
+        }
+
+        .d-pad-btn {
+            width: 32px;
+            height: 32px;
+            background: #4A4A4A;
+            border: 3px solid #333;
+            border-radius: 5px;
+            box-shadow: 0 3px 0 #333;
+            cursor: pointer;
+            font-size: 0.6em;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .d-pad-btn:active {
+            transform: translateY(3px);
+            box-shadow: none;
+        }
+
+        .action-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .game-btn {
+            background: #4A4A4A;
+            border: 3px solid #333;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: #fff;
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: 0 3px 0 #333;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+        }
+
+        .game-btn:active {
+            transform: translateY(3px);
+            box-shadow: none;
+        }
+
+        .play-btn {
+            background: var(--red);
+            border-color: #B31515;
+            box-shadow: 0 3px 0 #B31515;
+        }
+
+        .playlist {
+            border-top: 3px solid #4A4A4A;
+            padding-top: 12px;
+            height: 180px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            z-index: 4;
+        }
+
+        .playlist::-webkit-scrollbar {
+            width: 8px;
+            background: #333;
+            border-radius: 4px;
+        }
+
+        .playlist::-webkit-scrollbar-thumb {
+            background: var(--yellow);
+            border-radius: 4px;
+            border: 2px solid #4A4A4A;
+            box-shadow: inset 0 0 3px rgba(0,0,0,0.5);
+        }
+
+        .playlist-item {
+            color: #fff;
+            padding: 8px;
+            margin: 6px 0;
+            background: #333;
+            border: 2px solid #4A4A4A;
+            font-size: 0.6em;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-radius: 3px;
+        }
+
+        .playlist-item:hover {
+            background: #4A4A4A;
+            transform: translateX(5px);
+        }
+
+        .playlist-item.playing {
+            background: var(--red);
+            border-color: #B31515;
+        }
+
+        .speaker-holes {
+            display: flex;
+            gap: 6px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        .speaker-hole {
+            width: 10px;
+            height: 10px;
+            background: #4A4A4A;
+            border-radius: 50%;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .volume-indicator {
+            height: 4px;
+            background: #333;
+            margin: 8px 0;
+            border-radius: 2px;
+        }
+
+        .volume-bar {
+            height: 100%;
+            background: var(--yellow);
+            width: 100%;
+            border-radius: 2px;
+            transition: width 0.2s linear;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        @media (max-width: 400px) {
+            .gameboy-frame {
+                transform: scale(0.8);
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="crt-scanlines" aria-hidden="true"></div>
+    <div class="stars" id="stars" aria-hidden="true"></div>
+    
+    <div class="gameboy-frame" role="application" aria-label="مشغل الموسيقى الرجعي">
+        <div class="brand-label">RETRO PLAYER</div>
+        <div class="screen">
+            <canvas id="visualizer" aria-hidden="true"></canvas>
+            <div class="track-info" aria-live="polite">
+                <div>NOW PLAYING</div>
+                <div id="now-playing">Initializing...</div>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress"></div>
+            </div>
+
+            <div class="controls-wrapper">
+                <div class="d-pad">
+                    <button class="d-pad-btn up" aria-label="رفع الصوت">▲</button>
+                    <button class="d-pad-btn left" aria-label="المسار السابق">◀</button>
+                    <div class="designer-label">PAVLY EMAD</div>
+                    <button class="d-pad-btn right" aria-label="المسار التالي">▶</button>
+                    <button class="d-pad-btn down" aria-label="خفض الصوت">▼</button>
+                </div>
+
+                <div class="action-btns">
+                    <button class="game-btn play-btn" id="play-btn" aria-label="تشغيل/إيقاف">▶</button>
+                    <button class="game-btn" aria-label="إيقاف">■</button>
+                </div>
+            </div>
+
+            <div class="volume-indicator" aria-hidden="true">
+                <div class="volume-bar"></div>
+            </div>
+
+            <div class="playlist" id="playlist-container">
+                <!-- Dynamic playlist -->
+            </div>
+        </div>
+        <div class="speaker-holes">
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+        </div>
+    </div>
+
+    <script>
+        const songsData = [
+            {
+                url: "https://serv100.albumaty.com/songs_2020/Albumaty.Com_tamr_hsni_hdlany_-_mn_fylm_bhbk.mp3",
+                artist: "Tamer Hosny",
+                title: "Hadl3ny"
+            },
+            {
+                url: "https://serv100.albumaty.com/dl/3en/amr-diab/albums/weylomoni/01.We_Yloumouni.mp3",
+                artist: "Amr Diab",
+                title: "We Yloumouni"
+            },
+            {
+                url: "https://serv100.albumaty.com/dl/mem/mohamed-hamaki/albums/haga-mosh-tabe3ya/03.Haga_Mosh_Tabeaya.mp3",
+                artist: "Mohamed Hamaki",
+                title: "Haga Mosh Tabeaya"
+            },
+            {
+                url: "https://serv100.albumaty.com/dl/gem/george-wassouf/albums/tabeb-garah/01.Tabeeb_Garrah.mp3",
+                artist: "George Wasuf",
+                title: "Tabeeb Garrah"
+            },
+            {
+                url: "https://serv100.albumaty.com/dl/mem/mohamed-mounir/albums/fi-3sh2-elbnat/07.Rabak_Lama_Yered.mp3",
+                artist: "Mohamed Mounir",
+                title: "Rabak Lama Yered"
+            },
+            {
+                url: "https://serv100.albumaty.com/song2022/Albumaty.Com_hmzh_nmrh_ryah_alhyat.mp3",
+                artist: "Hamza Nemra",
+                title: "Ryah Alhyat"
+            },
+            {
+                url: "https://serv100.albumaty.com/dl/mem/mohamed-ramdan/singels/Albumaty.Com.Mohamed.Ramadan.100.Mesa.mp3",
+                artist: "Mohamed Ramadan",
+                title: "100 Mesa"
+            },
+            {
+                url: "https://serv100.albumaty.com/dl/alf/amal-maher/albums/welad-elnhrda/9-_Welad_El_Naharda.mp3",
+                artist: "Amal Maher",
+                title: "Welad El Naharda"
+            },
+            {
+                url: "https://serv100.albumaty.com/songs_2020/Albumaty.Com_gnat_sbaty_alanfaaly.mp3",
+                artist: "Jannat",
+                title: "Sbaty Alanfaaly"
+            },
+            {
+                url: "https://serv100.albumaty.com/dl/khh/khaled-aggag/albums/wa7dany/02.Lamouny.mp3",
+                artist: "Khaled Aggag",
+                title: "Lamouny"
+            },
+            {
+                url: "https://serv100.albumaty.com/dl/th/tamer-ashour/albums/khialy/05_-_Bye_Bye.mp3",
+                artist: "Tamer Ashour",
+                title: "Bye Bye"
+            }
+        ];
+
+        class EnhancedRetroPlayer {
+            constructor() {
+                this.audio = new Audio();
+                this.audio.crossOrigin = "anonymous";
+                this.tracks = songsData;
+                this.currentTrack = 0;
+                this.isPlaying = false;
+                this.visualizer = new Visualizer();
+                this.audioContext = null;
+                this.currentRequest = null;
+                this.initPlayer();
+            }
+
+            async initPlayer() {
+                await this.initPlaylist();
+                this.setupControls();
+                await this.setupAudioContext();
+                this.initKeyboardControls();
+                this.initDragDrop();
+                this.initVolumeIndicator();
+            }
+
+            async setupAudioContext() {
+                const initContext = async () => {
+                    try {
+                        if (!this.audioContext) {
+                            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                            await this.audioContext.resume();
+                            this.visualizer.initVisualizer(this.audio, this.audioContext);
+                        }
+                        if (this.audioContext.state === 'suspended') {
+                            await this.audioContext.resume();
+                        }
+                    } catch (error) {
+                        this.showError('خطأ في تهيئة الصوت');
+                        console.error('AudioContext error:', error);
+                    }
+                };
+
+                document.body.addEventListener('click', initContext, { once: true });
+                document.body.addEventListener('touchstart', initContext, { once: true });
+            }
+
+            async initPlaylist() {
+                const container = document.getElementById('playlist-container');
+                container.innerHTML = '';
+                this.tracks.forEach((track, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'playlist-item';
+                    item.textContent = `${i + 1}. ${track.title} - ${track.artist}`;
+                    item.onclick = async () => await this.selectTrack(i);
+                    container.appendChild(item);
+                });
+            }
+
+            setupControls() {
+                document.getElementById('play-btn').onclick = () => this.togglePlay();
+                document.querySelector('.game-btn:not(.play-btn)').onclick = () => this.stop();
+                document.querySelector('.up').onclick = () => this.volumeUp();
+                document.querySelector('.down').onclick = () => this.volumeDown();
+                document.querySelector('.left').onclick = () => this.prevTrack();
+                document.querySelector('.right').onclick = () => this.nextTrack();
+                
+                this.audio.addEventListener('error', (e) => {
+                    this.showError('خطأ في تشغيل الصوت');
+                    console.error('Audio error:', e);
+                });
+            }
+
+            initKeyboardControls() {
+                document.addEventListener('keydown', (e) => {
+                    switch(e.code) {
+                        case 'Space': 
+                            e.preventDefault();
+                            this.togglePlay();
+                            break;
+                        case 'ArrowRight': this.nextTrack(); break;
+                        case 'ArrowLeft': this.prevTrack(); break;
+                        case 'ArrowUp': this.volumeUp(); break;
+                        case 'ArrowDown': this.volumeDown(); break;
+                    }
+                });
+            }
+
+            initDragDrop() {
+                const container = document.body;
+                
+                container.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    container.classList.add('dragover');
+                });
+
+                container.addEventListener('dragleave', () => {
+                    container.classList.remove('dragover');
+                });
+
+                container.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    container.classList.remove('dragover');
+                    
+                    const files = Array.from(e.dataTransfer.files)
+                        .filter(file => file.type.startsWith('audio/'));
+                    
+                    if(files.length) {
+                        await this.handleNewFiles(files);
+                    }
+                });
+            }
+
+            async handleNewFiles(files) {
+                const newTracks = await Promise.all(files.map(async file => ({
+                    url: URL.createObjectURL(file),
+                    artist: 'مستخدم',
+                    title: file.name.replace(/\.[^/.]+$/, "")
+                })));
+                
+                this.tracks = [...newTracks, ...this.tracks];
+                await this.initPlaylist();
+                this.loadTrack(0);
+            }
+
+            initVolumeIndicator() {
+                const updateVolume = () => {
+                    const bar = document.querySelector('.volume-bar');
+                    bar.style.width = `${this.audio.volume * 100}%`;
+                };
+                
+                this.audio.addEventListener('volumechange', updateVolume);
+                updateVolume();
+            }
+
+            showError(message) {
+                const infoDiv = document.getElementById('now-playing');
+                infoDiv.textContent = message;
+                infoDiv.style.color = 'var(--red)';
+                setTimeout(() => {
+                    infoDiv.style.color = '';
+                    infoDiv.textContent = this.tracks[this.currentTrack]?.artist || 'Initializing...';
+                }, 5000);
+            }
+
+            async selectTrack(index) {
+                try {
+                    this.currentTrack = index;
+                    await this.loadTrack(index);
+                    if (this.isPlaying) await this.audio.play();
+                } catch (error) {
+                    this.showError('تعذر تحميل المقطع');
+                    console.error('Track selection error:', error);
+                }
+            }
+
+            async loadTrack(index) {
+                try {
+                    if(this.currentRequest) {
+                        this.currentRequest.cancel();
+                    }
+                    
+                    this.audio.src = this.tracks[index].url;
+                    await new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('مهلة التحميل')), 15000);
+                        this.audio.addEventListener('canplaythrough', () => {
+                            clearTimeout(timer);
+                            resolve();
+                        });
+                        this.audio.addEventListener('error', (e) => {
+                            clearTimeout(timer);
+                            reject(e);
+                        });
+                    });
+                    this.updateUI();
+                    this.highlightTrack();
+                } catch (error) {
+                    this.showError(error.message || 'فشل في التحميل');
+                    console.error('Load error:', error);
+                    throw error;
+                }
+            }
+
+            updateUI() {
+                document.querySelector('.track-info div:first-child').textContent =
+                    this.tracks[this.currentTrack].title.toUpperCase();
+                document.getElementById('now-playing').textContent =
+                    this.tracks[this.currentTrack].artist;
+            }
+
+            highlightTrack() {
+                document.querySelectorAll('.playlist-item').forEach((item, i) => {
+                    item.classList.toggle('playing', i === this.currentTrack);
+                });
+            }
+
+            async togglePlay() {
+                try {
+                    this.isPlaying = !this.isPlaying;
+                    document.getElementById('play-btn').textContent = this.isPlaying ? '⏸' : '▶';
+                    if (this.isPlaying) {
+                        await this.audio.play();
+                    } else {
+                        this.audio.pause();
+                    }
+                    this.updateProgress();
+                } catch (error) {
+                    this.showError('فشل في التشغيل');
+                    console.error('Play error:', error);
+                }
+            }
+
+            updateProgress() {
+                this.audio.ontimeupdate = () => {
+                    if (this.audio.duration) {
+                        const progress = (this.audio.currentTime / this.audio.duration) * 100;
+                        document.querySelector('.progress').style.width = `${progress}%`;
+                    }
+                };
+            }
+
+            async nextTrack() {
+                this.currentTrack = (this.currentTrack + 1) % this.tracks.length;
+                await this.loadTrack(this.currentTrack);
+                if (this.isPlaying) await this.audio.play();
+            }
+
+            async prevTrack() {
+                this.currentTrack = (this.currentTrack - 1 + this.tracks.length) % this.tracks.length;
+                await this.loadTrack(this.currentTrack);
+                if (this.isPlaying) await this.audio.play();
+            }
+
+            volumeUp() {
+                this.audio.volume = Math.min(1, this.audio.volume + 0.1);
+            }
+
+            volumeDown() {
+                this.audio.volume = Math.max(0, this.audio.volume - 0.1);
+            }
+
+            stop() {
+                this.audio.pause();
+                this.audio.currentTime = 0;
+                this.isPlaying = false;
+                document.getElementById('play-btn').textContent = '▶';
+                document.querySelector('.progress').style.width = '0%';
+            }
+        }
+
+        class Visualizer {
+            constructor() {
+                this.canvas = document.getElementById('visualizer');
+                this.ctx = this.canvas.getContext('2d');
+                this.analyser = null;
+                this.dataArray = null;
+            }
+
+            initVisualizer(audioElement, audioContext) {
+                const source = audioContext.createMediaElementSource(audioElement);
+                this.analyser = audioContext.createAnalyser();
+                
+                source.connect(this.analyser);
+                this.analyser.connect(audioContext.destination);
+                
+                this.analyser.fftSize = 256;
+                const bufferLength = this.analyser.frequencyBinCount;
+                this.dataArray = new Uint8Array(bufferLength);
+                
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+                this.draw();
+            }
+
+            resizeCanvas() {
+                this.canvas.width = this.canvas.offsetWidth;
+                this.canvas.height = this.canvas.offsetHeight;
+            }
+
+            draw() {
+                if (!this.analyser) return;
+                
+                this.analyser.getByteFrequencyData(this.dataArray);
+                this.ctx.fillStyle = '#1a1a1a';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeStyle = '#8BAC0F';
+                this.ctx.beginPath();
+                
+                const sliceWidth = this.canvas.width * 1.0 / this.dataArray.length;
+                let x = 0;
+                
+                for (let i = 0; i < this.dataArray.length; i++) {
+                    const v = this.dataArray[i] / 128.0;
+                    const y = v * this.canvas.height/2;
+                    
+                    if(i === 0) {
+                        this.ctx.moveTo(x, y);
+                    } else {
+                        this.ctx.lineTo(x, y);
+                    }
+                    
+                    x += sliceWidth;
+                }
+                
+                this.ctx.stroke();
+                
+                this.ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                requestAnimationFrame(() => this.draw());
+            }
+        }
+
+        // Initialize player
+        const player = new EnhancedRetroPlayer();
+
+        // Cleanup on window close
+        window.addEventListener('beforeunload', () => {
+            player.audio.pause();
+            if(player.audioContext) {
+                player.audioContext.close();
+            }
+        });
+
+        // Create stars effect
+        function createStars() {
+            const container = document.getElementById('stars');
+            container.innerHTML = '';
+            for (let i = 0; i < 120; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.width = `${Math.random() * 2}px`;
+                star.style.height = star.style.width;
+                star.style.setProperty('--duration', `${Math.random() * 2 + 1}s`);
+                container.appendChild(star);
+            }
+        }
+        createStars();
+    </script>
+</body>
+</html>
